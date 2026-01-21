@@ -181,6 +181,27 @@ public sealed partial class MarkingPicker : Control
         }
     }
 
+    private string GetMarkingName(MarkingPrototype marking) => Loc.GetString($"marking-{marking.ID}");
+
+    private List<string> GetMarkingStateNames(MarkingPrototype marking)
+    {
+        List<string> result = new();
+        foreach (var markingState in marking.Sprites)
+        {
+            switch (markingState)
+            {
+                case SpriteSpecifier.Rsi rsi:
+                    result.Add(Loc.GetString($"marking-{marking.ID}-{rsi.RsiState}"));
+                    break;
+                case SpriteSpecifier.Texture texture:
+                    result.Add(Loc.GetString($"marking-{marking.ID}-{texture.TexturePath.Filename}"));
+                    break;
+            }
+        }
+
+        return result;
+    }
+
     private IReadOnlyDictionary<string, MarkingPrototype> GetMarkings(MarkingCategories category)
     {
         return IgnoreSpecies
@@ -195,10 +216,10 @@ public sealed partial class MarkingPicker : Control
         CMarkingsUnused.Clear();
         _selectedUnusedMarking = null;
 
-        var sortedMarkings = GetMarkings(_selectedMarkingCategory).Values
-            .Where(m => m.ID.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-                m.GetName().Contains(filter, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(p => p.GetName());
+        var sortedMarkings = GetMarkings(_selectedMarkingCategory).Values.Where(m =>
+            m.ID.ToLower().Contains(filter.ToLower()) ||
+            GetMarkingName(m).ToLower().Contains(filter.ToLower())
+        ).OrderBy(p => Loc.GetString(GetMarkingName(p)));
 
         foreach (var marking in sortedMarkings)
         {
@@ -207,7 +228,7 @@ public sealed partial class MarkingPicker : Control
                 continue;
             }
 
-            var item = CMarkingsUnused.AddItem(marking.GetName(), _sprite.Frame0(marking.Sprites[0]));
+            var item = CMarkingsUnused.AddItem($"{GetMarkingName(marking)}", _sprite.Frame0(marking.Sprites[0]));
             item.Metadata = marking;
         }
 
@@ -235,8 +256,7 @@ public sealed partial class MarkingPicker : Control
                 continue;
             }
 
-            var text = Loc.GetString(marking.Forced ? "marking-used-forced" : "marking-used",
-                ("marking-name", newMarking.GetName()),
+            var text = Loc.GetString(marking.Forced ? "marking-used-forced" : "marking-used", ("marking-name", $"{GetMarkingName(newMarking)}"),
                 ("marking-category", Loc.GetString($"markings-category-{newMarking.MarkingCategory}")));
 
             var _item = new ItemList.Item(CMarkingsUsed)
@@ -382,7 +402,7 @@ public sealed partial class MarkingPicker : Control
             return;
         }
 
-        var stateNames = MarkingManager.GetMarkingStateNames(prototype);
+        var stateNames = GetMarkingStateNames(prototype);
         _currentMarkingColors.Clear();
         CMarkingColors.RemoveAllChildren();
         List<ColorSelectorSliders> colorSliders = new();
@@ -498,9 +518,7 @@ public sealed partial class MarkingPicker : Control
         CMarkingsUnused.Remove(_selectedUnusedMarking);
         var item = new ItemList.Item(CMarkingsUsed)
         {
-            Text = Loc.GetString("marking-used",
-                ("marking-name", marking.GetName()),
-                ("marking-category", Loc.GetString($"markings-category-{marking.MarkingCategory}"))),
+            Text = Loc.GetString("marking-used", ("marking-name", $"{GetMarkingName(marking)}"), ("marking-category", Loc.GetString($"markings-category-{marking.MarkingCategory}"))),
             Icon = _sprite.Frame0(marking.Sprites[0]),
             Selectable = true,
             Metadata = marking,
@@ -525,10 +543,9 @@ public sealed partial class MarkingPicker : Control
 
         if (marking.MarkingCategory == _selectedMarkingCategory)
         {
-            var item = CMarkingsUnused.AddItem(marking.GetName(), _sprite.Frame0(marking.Sprites[0]));
+            var item = CMarkingsUnused.AddItem($"{GetMarkingName(marking)}", _sprite.Frame0(marking.Sprites[0]));
             item.Metadata = marking;
         }
-
         _selectedMarking = null;
         CMarkingColors.Visible = false;
         OnMarkingRemoved?.Invoke(_currentMarkings);
